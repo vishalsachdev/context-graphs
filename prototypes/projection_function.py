@@ -280,21 +280,51 @@ def build_datagraph_from_sessions(session_files: List[str]) -> DecisionDatagraph
     return datagraph
 
 
-def demo():
-    """Demonstrate the projection function."""
-    from pathlib import Path
+def get_session_files(transcripts_dir: Path, limit: int = 10) -> List[str]:
+    """
+    Get session files from a transcripts directory.
 
-    # Find some session files
-    projects_dir = Path.home() / ".claude" / "projects"
+    Handles both flat directories and nested project structures.
+    """
     session_files = []
 
-    for project_dir in projects_dir.iterdir():
-        if project_dir.is_dir():
-            jsonl_files = [f for f in project_dir.glob("*.jsonl")
-                          if not f.name.startswith("agent-")]
-            session_files.extend(str(f) for f in jsonl_files[:2])
+    if transcripts_dir.is_dir():
+        # Try flat structure first
+        jsonl_files = list(transcripts_dir.glob("*.jsonl"))
 
-    session_files = session_files[:10]  # Limit for demo
+        # If no files found, try nested structure
+        if not jsonl_files:
+            for project_dir in transcripts_dir.iterdir():
+                if project_dir.is_dir():
+                    jsonl_files.extend(
+                        f for f in project_dir.glob("*.jsonl")
+                        if not f.name.startswith("agent-")
+                    )
+        else:
+            jsonl_files = [f for f in jsonl_files if not f.name.startswith("agent-")]
+
+        # Sort by modification time
+        jsonl_files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
+        session_files = [str(f) for f in jsonl_files[:limit]]
+
+    return session_files
+
+
+def demo(transcripts_dir: Optional[Path] = None, limit: int = 10):
+    """Demonstrate the projection function."""
+    # Determine transcript source
+    if transcripts_dir:
+        print(f"Using transcripts from: {transcripts_dir}")
+        session_files = get_session_files(transcripts_dir, limit=limit)
+    else:
+        # Default: ~/.claude/projects
+        default_dir = Path.home() / ".claude" / "projects"
+        print(f"Using default transcripts: {default_dir}")
+        session_files = get_session_files(default_dir, limit=limit)
+
+    if not session_files:
+        print("No session files found!")
+        return
 
     print(f"Building datagraph from {len(session_files)} sessions...")
     datagraph = build_datagraph_from_sessions(session_files)
@@ -343,5 +373,31 @@ def demo():
         print(f"\n[Relevance score: {context.relevance_score:.2f}]")
 
 
+def main():
+    """CLI entry point."""
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Projection function demo - project relevant context from decision history"
+    )
+    parser.add_argument(
+        "--transcripts", "-t",
+        type=str,
+        default=None,
+        help="Path to transcripts directory (default: ~/.claude/projects)"
+    )
+    parser.add_argument(
+        "--limit", "-n",
+        type=int,
+        default=10,
+        help="Max sessions to analyze (default: 10)"
+    )
+
+    args = parser.parse_args()
+
+    transcripts_path = Path(args.transcripts).expanduser() if args.transcripts else None
+    demo(transcripts_dir=transcripts_path, limit=args.limit)
+
+
 if __name__ == "__main__":
-    demo()
+    main()

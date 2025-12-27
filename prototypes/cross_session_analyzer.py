@@ -305,6 +305,37 @@ def generate_report(patterns: AggregatePatterns) -> str:
     return "\n".join(lines)
 
 
+def get_sessions_from_directory(transcripts_dir: Path, limit: int = 10) -> List[Dict]:
+    """
+    Get sessions from a local directory of JSONL files.
+
+    Args:
+        transcripts_dir: Directory containing .jsonl transcript files
+        limit: Max number of sessions to return
+    """
+    sessions = []
+
+    # Handle both flat directory and nested project directories
+    jsonl_files = list(transcripts_dir.glob("*.jsonl"))
+    if not jsonl_files:
+        # Try nested structure like ~/.claude/projects/*/
+        jsonl_files = list(transcripts_dir.glob("*/*.jsonl"))
+
+    # Filter out agent files and sort by modification time
+    jsonl_files = [f for f in jsonl_files if not f.name.startswith("agent-")]
+    jsonl_files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
+
+    for fpath in jsonl_files[:limit]:
+        project = fpath.parent.name.split('-')[-1] if '-' in fpath.parent.name else fpath.stem
+        sessions.append({
+            'file_path': str(fpath),
+            'project': project,
+            'session_id': fpath.stem,
+        })
+
+    return sessions
+
+
 def main():
     """Run cross-session analysis."""
     import argparse
@@ -325,6 +356,12 @@ def main():
         help="Search query to filter sessions"
     )
     parser.add_argument(
+        "--transcripts", "-t",
+        type=str,
+        default=None,
+        help="Path to transcripts directory (default: ~/.claude/projects)"
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         help="Output as JSON instead of report"
@@ -334,7 +371,12 @@ def main():
 
     print(f"Getting sample of {args.sample} sessions...")
 
-    if args.query:
+    # Determine transcript source
+    if args.transcripts:
+        transcripts_path = Path(args.transcripts).expanduser()
+        print(f"Using transcripts from: {transcripts_path}")
+        sessions = get_sessions_from_directory(transcripts_path, limit=args.sample)
+    elif args.query:
         sessions = get_sessions_via_aichat(args.query, limit=args.sample)
     else:
         sessions = get_sample_sessions(sample_size=args.sample, diverse=True)

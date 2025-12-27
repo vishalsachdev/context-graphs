@@ -66,18 +66,56 @@ Pre-generated analysis results (viewable without running code):
 
 ## Running the Code
 
+### Using Your Own Transcripts (Default)
+
 ```bash
 cd prototypes
 
 # Extract traces from a single session
-python3 decision_trace_extractor.py ~/.claude/projects/*/session.jsonl
+python3 decision_trace_extractor.py ~/.claude/projects/-*/session.jsonl
 
-# Analyze patterns across sessions
+# Analyze patterns across sessions (uses ~/.claude/projects by default)
 python3 cross_session_analyzer.py --sample 15
 
 # Demo the projection function
 python3 projection_function.py
 ```
+
+### Using Sample Data
+
+The repo includes sample transcripts for testing without your own Claude Code history:
+
+```bash
+cd prototypes
+
+# Analyze the included sample sessions
+python3 cross_session_analyzer.py --transcripts ../data/samples --sample 3
+
+# Run projection demo on samples
+python3 projection_function.py --transcripts ../data/samples
+```
+
+### Custom Transcript Location
+
+Point to any directory containing `.jsonl` transcript files:
+
+```bash
+# Custom path
+python3 cross_session_analyzer.py --transcripts /path/to/transcripts
+
+# With other options
+python3 projection_function.py -t ~/my-transcripts -n 20
+```
+
+## Data
+
+### `/data/samples`
+Sample Claude Code session transcripts for testing:
+- `sample-helloworld.jsonl` - Session from helloworld project
+- `sample-api.jsonl` - Session from API project
+- `sample-illinihunt.jsonl` - Session from illinihunt project
+
+These allow others to run the analysis without their own Claude Code history.
 
 ## Origin
 
